@@ -15,6 +15,9 @@ RUN pnpm install --frozen-lockfile
 
 COPY . .
 
+# Next.js expects `public/` for static assets; COPY in runner fails if it never existed in the repo
+RUN mkdir -p public
+
 # Public env vars baked at build time (override when building the image)
 ARG NEXT_PUBLIC_POCKETBASE_URL
 ENV NEXT_PUBLIC_POCKETBASE_URL=${NEXT_PUBLIC_POCKETBASE_URL}
