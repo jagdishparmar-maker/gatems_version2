@@ -1,0 +1,33 @@
+export interface Vehicle {
+  id: string;
+  vehicleNo: string;
+  transport: string;
+  customer: string;
+  checkedInTime: string;
+  checkOutDate?: string;
+  size: 'short' | 'medium' | 'long';
+  status: 'parked' | 'charging' | 'loading' | 'unloading' | 'ready_to_exit';
+  rawStatus: string;
+  type: 'Inward' | 'Outward';
+  chargeLevel?: number;
+  progress?: number;
+  assignedDock: number;
+  driverName?: string;
+  driverPhone?: string;
+  containerNo?: string;
+  weight?: string;
+  origin?: string;
+  destination?: string;
+  imageUrl?: string;
+  dockInDateTime?: string;
+  dockOutDateTime?: string;
+  remarks?: string;
+  checkedInBy?: string;
+  checkedOutBy?: string;
+  created?: string;
+  updated?: string;
+  rawCheckInDate?: string;
+  rawCheckOutDate?: string;
+  rawDockInDate?: string;
+  rawDockOutDate?: string;
+}
