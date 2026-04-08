@@ -1,13 +1,21 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import VehicleCard from '@/components/VehicleCard';
 import VehicleDetailModal from '@/components/VehicleDetailModal';
+import VehicleToastStack, {
+  type ToastItem,
+} from '@/components/VehicleToastStack';
 import { Truck, Loader2, History as HistoryIcon, LogOut } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { pb } from '@/lib/pocketbase';
 import { mapVehicleRecord } from '@/lib/vehicle-mapper';
+import {
+  notificationFromVehicleEvent,
+  type VehicleToastPayload,
+} from '@/lib/vehicle-realtime-notify';
+import { playNotificationSound } from '@/lib/notification-sound';
 import { useAuth } from '@/components/AuthProvider';
 import type { Vehicle } from '@/types/vehicle';
 
@@ -23,6 +31,25 @@ export default function Page() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const statusSnapshotRef = useRef<Map<string, string>>(new Map());
+
+  const pushVehicleNotification = useCallback((payload: VehicleToastPayload) => {
+    const id =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `toast-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const { sound, ...rest } = payload;
+    setToasts((prev) => [...prev, { id, ...rest }]);
+    playNotificationSound(sound);
+    window.setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 6000);
+  }, []);
+
+  const dismissToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
 
   useEffect(() => {
     const fetchVehicles = async () => {
@@ -31,6 +58,14 @@ export default function Page() {
         const records = await pb.collection('vehicles').getFullList({
           filter: "status!='CheckedOut'",
           requestKey: null,
+        });
+
+        statusSnapshotRef.current.clear();
+        records.forEach((r) => {
+          statusSnapshotRef.current.set(
+            r.id,
+            ((r as { status?: string }).status as string) || ''
+          );
         });
 
         const mappedVehicles: Vehicle[] = records.map((item) =>
@@ -53,13 +88,41 @@ export default function Page() {
 
     pb.collection('vehicles').subscribe('*', (e) => {
       if (e.action === 'create') {
-        if (e.record.status !== 'CheckedOut') {
-          setVehicles((prev) => [...prev, mapVehicleRecord(e.record)]);
-        }
-      } else if (e.action === 'update') {
         if (e.record.status === 'CheckedOut') {
+          return;
+        }
+        const toastPayload = notificationFromVehicleEvent(
+          'create',
+          e.record,
+          undefined
+        );
+        if (toastPayload) {
+          pushVehicleNotification(toastPayload);
+        }
+        statusSnapshotRef.current.set(
+          e.record.id,
+          ((e.record as { status?: string }).status as string) || ''
+        );
+        setVehicles((prev) => [...prev, mapVehicleRecord(e.record)]);
+      } else if (e.action === 'update') {
+        const prevStatus = statusSnapshotRef.current.get(e.record.id);
+        const toastPayload = notificationFromVehicleEvent(
+          'update',
+          e.record,
+          prevStatus
+        );
+        if (toastPayload) {
+          pushVehicleNotification(toastPayload);
+        }
+
+        if (e.record.status === 'CheckedOut') {
+          statusSnapshotRef.current.delete(e.record.id);
           setVehicles((prev) => prev.filter((v) => v.id !== e.record.id));
         } else {
+          statusSnapshotRef.current.set(
+            e.record.id,
+            ((e.record as { status?: string }).status as string) || ''
+          );
           setVehicles((prev) => {
             const index = prev.findIndex((v) => v.id === e.record.id);
             if (index !== -1) {
@@ -71,6 +134,7 @@ export default function Page() {
           });
         }
       } else if (e.action === 'delete') {
+        statusSnapshotRef.current.delete(e.record.id);
         setVehicles((prev) => prev.filter((v) => v.id !== e.record.id));
       }
     });
@@ -78,7 +142,7 @@ export default function Page() {
     return () => {
       pb.collection('vehicles').unsubscribe('*');
     };
-  }, []);
+  }, [pushVehicleNotification]);
 
   const parkedVehicles = vehicles.filter(v => v.assignedDock === 0 && v.status !== 'ready_to_exit');
   const inwardParkedVehicles = parkedVehicles.filter(v => v.type === 'Inward');
@@ -106,6 +170,7 @@ export default function Page() {
 
   return (
     <main className="min-h-screen bg-zinc-50 py-3 px-4 sm:px-6 lg:px-8 relative overflow-hidden font-sans">
+      <VehicleToastStack toasts={toasts} onDismiss={dismissToast} />
       {/* Atmospheric Background Glows - Subtler for Light Theme */}
       <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-blue-500/[0.03] rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-0 right-1/4 w-[400px] h-[400px] bg-indigo-500/[0.03] rounded-full blur-[100px] pointer-events-none" />
