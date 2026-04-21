@@ -97,8 +97,6 @@ export default function HistoryPage() {
               </h1>
               <div className="flex items-center gap-2 mt-1">
                 <p className="text-[7px] font-bold text-zinc-400 uppercase tracking-[0.3em]">Historical Logistics Data</p>
-                <span className="text-[7px] font-bold text-zinc-300 uppercase tracking-[0.3em]">•</span>
-                <p className="text-[7px] font-bold text-blue-500/60 uppercase tracking-[0.3em]">By Jagdish Parmar</p>
               </div>
             </div>
           </div>

@@ -47,7 +47,6 @@ export default function LoginPage() {
             </div>
             <h1 className="text-2xl font-black text-white tracking-tighter uppercase">GateMS</h1>
             <p className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.2em]">Vehicle Tracking System</p>
-            <p className="text-orange-500/60 text-[8px] font-black uppercase tracking-[0.2em] mt-1">By Jagdish Parmar</p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">

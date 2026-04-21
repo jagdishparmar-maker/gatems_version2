@@ -189,8 +189,6 @@ export default function Page() {
                 </h1>
                 <div className="flex items-center gap-2 mt-0.5">
                   <span className="text-[7px] font-bold text-zinc-400 uppercase tracking-[0.3em]">Vehicle Tracking System</span>
-                  <span className="text-[7px] font-bold text-zinc-300 uppercase tracking-[0.3em]">•</span>
-                  <span className="text-[7px] font-bold text-blue-500/60 uppercase tracking-[0.3em]">By Jagdish Parmar</span>
                 </div>
               </div>
             </div>

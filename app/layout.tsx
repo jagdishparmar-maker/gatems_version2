@@ -17,7 +17,7 @@ import { AuthProvider } from '@/components/AuthProvider';
 
 export const metadata: Metadata = {
   title: 'GateMS - Vehicle Tracker',
-  description: 'GateMS - a vehicle tracking system. Developed by Jagdish Parmar.',
+  description: 'GateMS — vehicle tracking system.',
 };
 
 export default function RootLayout({children}: {children: React.ReactNode}) {
