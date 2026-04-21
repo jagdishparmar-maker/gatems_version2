@@ -7,10 +7,17 @@ import VehicleDetailModal from '@/components/VehicleDetailModal';
 import VehicleToastStack, {
   type ToastItem,
 } from '@/components/VehicleToastStack';
-import { Truck, Loader2, History as HistoryIcon, LogOut } from 'lucide-react';
+import {
+  Truck,
+  Loader2,
+  History as HistoryIcon,
+  LogOut,
+  RefreshCw,
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { pb } from '@/lib/pocketbase';
 import { mapVehicleRecord } from '@/lib/vehicle-mapper';
+import { VEHICLE_USER_EXPAND } from '@/lib/user-display';
 import {
   notificationFromVehicleEvent,
   type VehicleToastPayload,
@@ -29,6 +36,7 @@ export default function Page() {
   const { logout } = useAuth();
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
@@ -51,42 +59,63 @@ export default function Page() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  useEffect(() => {
-    const fetchVehicles = async () => {
-      try {
+  const loadVehicles = useCallback(async (isManualRefresh: boolean) => {
+    try {
+      if (isManualRefresh) {
+        setRefreshing(true);
+      } else {
         setLoading(true);
-        const records = await pb.collection('vehicles').getFullList({
-          filter: "status!='CheckedOut'",
-          requestKey: null,
-        });
+      }
 
-        statusSnapshotRef.current.clear();
-        records.forEach((r) => {
-          statusSnapshotRef.current.set(
-            r.id,
-            ((r as { status?: string }).status as string) || ''
-          );
-        });
+      const records = await pb.collection('vehicles').getFullList({
+        filter: "status!='CheckedOut'",
+        requestKey: null,
+        expand: VEHICLE_USER_EXPAND,
+      });
 
-        const mappedVehicles: Vehicle[] = records.map((item) =>
-          mapVehicleRecord(item)
+      statusSnapshotRef.current.clear();
+      records.forEach((r) => {
+        statusSnapshotRef.current.set(
+          r.id,
+          ((r as { status?: string }).status as string) || ''
         );
-        setVehicles(mappedVehicles);
-        setError(null);
-      } catch (err: unknown) {
-        const e = err as { isAbort?: boolean };
-        if (e.isAbort) return;
+      });
 
-        console.error('Error fetching vehicles:', err);
-        setError('Failed to load real-time vehicle data. Please try again later.');
-      } finally {
+      const mappedVehicles: Vehicle[] = records.map((item) =>
+        mapVehicleRecord(item)
+      );
+      setVehicles(mappedVehicles);
+      setError(null);
+    } catch (err: unknown) {
+      const e = err as { isAbort?: boolean };
+      if (e.isAbort) return;
+
+      console.error('Error fetching vehicles:', err);
+      setError('Failed to load real-time vehicle data. Please try again later.');
+    } finally {
+      if (isManualRefresh) {
+        setRefreshing(false);
+      } else {
         setLoading(false);
       }
-    };
+    }
+  }, []);
 
-    fetchVehicles();
+  useEffect(() => {
+    void loadVehicles(false);
 
-    pb.collection('vehicles').subscribe('*', (e) => {
+    pb.collection('vehicles').subscribe('*', async (e) => {
+      const fetchExpandedVehicle = async (id: string) => {
+        try {
+          return await pb.collection('vehicles').getOne(id, {
+            expand: VEHICLE_USER_EXPAND,
+            requestKey: null,
+          });
+        } catch {
+          return e.record;
+        }
+      };
+
       if (e.action === 'create') {
         if (e.record.status === 'CheckedOut') {
           return;
@@ -103,7 +132,8 @@ export default function Page() {
           e.record.id,
           ((e.record as { status?: string }).status as string) || ''
         );
-        setVehicles((prev) => [...prev, mapVehicleRecord(e.record)]);
+        const record = await fetchExpandedVehicle(e.record.id);
+        setVehicles((prev) => [...prev, mapVehicleRecord(record)]);
       } else if (e.action === 'update') {
         const prevStatus = statusSnapshotRef.current.get(e.record.id);
         const toastPayload = notificationFromVehicleEvent(
@@ -123,14 +153,15 @@ export default function Page() {
             e.record.id,
             ((e.record as { status?: string }).status as string) || ''
           );
+          const record = await fetchExpandedVehicle(e.record.id);
           setVehicles((prev) => {
             const index = prev.findIndex((v) => v.id === e.record.id);
             if (index !== -1) {
               const newVehicles = [...prev];
-              newVehicles[index] = mapVehicleRecord(e.record);
+              newVehicles[index] = mapVehicleRecord(record);
               return newVehicles;
             }
-            return [...prev, mapVehicleRecord(e.record)];
+            return [...prev, mapVehicleRecord(record)];
           });
         }
       } else if (e.action === 'delete') {
@@ -142,7 +173,7 @@ export default function Page() {
     return () => {
       pb.collection('vehicles').unsubscribe('*');
     };
-  }, [pushVehicleNotification]);
+  }, [loadVehicles, pushVehicleNotification]);
 
   const parkedVehicles = vehicles.filter(v => v.assignedDock === 0 && v.status !== 'ready_to_exit');
   const inwardParkedVehicles = parkedVehicles.filter(v => v.type === 'Inward');
@@ -194,7 +225,7 @@ export default function Page() {
             </div>
           </div>
           
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-4">
             <Link 
               href="/history"
               className="flex items-center gap-2 px-4 py-2 bg-white border border-zinc-200 rounded-sm hover:bg-zinc-50 transition-colors shadow-sm group"
@@ -202,6 +233,23 @@ export default function Page() {
               <HistoryIcon size={14} className="text-zinc-400 group-hover:text-blue-600 transition-colors" />
               <span className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">Vehicle History</span>
             </Link>
+
+            <button
+              type="button"
+              onClick={() => void loadVehicles(true)}
+              disabled={refreshing}
+              aria-busy={refreshing}
+              aria-label="Refresh vehicle list"
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-zinc-200 rounded-sm hover:bg-zinc-50 transition-colors shadow-sm disabled:opacity-60 disabled:pointer-events-none group"
+            >
+              <RefreshCw
+                size={14}
+                className={`text-zinc-400 group-hover:text-blue-600 transition-colors ${refreshing ? 'animate-spin' : ''}`}
+              />
+              <span className="text-[9px] font-black text-zinc-600 uppercase tracking-widest group-hover:text-zinc-900">
+                Refresh
+              </span>
+            </button>
             
             <button 
               onClick={logout}

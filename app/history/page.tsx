@@ -6,6 +6,7 @@ import { Truck, Loader2, ChevronLeft, Search, LogOut } from 'lucide-react';
 import { AnimatePresence } from 'motion/react';
 import { pb } from '@/lib/pocketbase';
 import { mapVehicleRecord } from '@/lib/vehicle-mapper';
+import { VEHICLE_USER_EXPAND } from '@/lib/user-display';
 import { useAuth } from '@/components/AuthProvider';
 import VehicleCard from '@/components/VehicleCard';
 import VehicleDetailModal from '@/components/VehicleDetailModal';
@@ -44,6 +45,7 @@ export default function HistoryPage() {
         filter: filter,
         sort: '-Check_In_Date',
         requestKey: null,
+        expand: VEHICLE_USER_EXPAND,
       });
 
       setVehicles(

@@ -2,6 +2,7 @@ import type { RecordModel } from 'pocketbase';
 import { pb } from '@/lib/pocketbase';
 import type { Vehicle } from '@/types/vehicle';
 import { formatDateTime } from '@/lib/vehicle-utils';
+import { resolveVehicleUserField } from '@/lib/user-display';
 
 type MapOptions = {
   /** When true, CheckedOut maps to ready_to_exit (history). Default false uses live-dashboard mapping. */
@@ -52,8 +53,8 @@ export function mapVehicleRecord(
     dockInDateTime: formatDateTime(item.Dock_In_DateTime),
     dockOutDateTime: formatDateTime(item.Dock_Out_DateTime),
     remarks: item.Remarks || 'N/A',
-    checkedInBy: item.Checked_In_By || 'N/A',
-    checkedOutBy: item.Checked_Out_By || 'N/A',
+    checkedInBy: resolveVehicleUserField(item, 'Checked_In_By'),
+    checkedOutBy: resolveVehicleUserField(item, 'Checked_Out_By'),
     created: formatDateTime(item.created),
     updated: formatDateTime(item.updated),
     rawCheckInDate: item.Check_In_Date,
